@@ -1,5 +1,8 @@
 import java.sql.*;
 import java.util.ArrayList;
+import java.io.File;
+
+import javax.swing.JOptionPane;
 
 public class DatabaseManager {
 
@@ -8,22 +11,60 @@ public class DatabaseManager {
     // Connect to SQLite database (company.db)
     public boolean connect(String dbName) {
         try {
-            // Load SQLite driver
+            // Load SQLite driver (MUST have sqlite-jdbc-3.51.1.0.jar on classpath)
             Class.forName("org.sqlite.JDBC");
 
-            // SQLite connection string
-            String url = "jdbc:sqlite:" + dbName;
+            // Resolve DB file relative to where the program is started
+            File dbFile = new File(dbName);
+            if (!dbFile.exists()) {
+                JOptionPane.showMessageDialog(
+                        null,
+                        "Database file not found:\n" + dbFile.getAbsolutePath(),
+                        "DB Error",
+                        JOptionPane.ERROR_MESSAGE
+                );
+                return false;
+            }
+
+            // Use absolute path so working directory cannot break this
+            String url = "jdbc:sqlite:" + dbFile.getAbsolutePath();
 
             conn = DriverManager.getConnection(url);
 
             // Activate foreign key support
-            Statement stmt = conn.createStatement();
-            stmt.execute("PRAGMA foreign_keys = ON");
+            try (Statement stmt = conn.createStatement()) {
+                stmt.execute("PRAGMA foreign_keys = ON");
+            }
 
             return true;
 
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(
+                    null,
+                    "SQLite JDBC driver not found.\n" +
+                    "Make sure sqlite-jdbc-3.51.1.0.jar is on the classpath.",
+                    "DB Error",
+                    JOptionPane.ERROR_MESSAGE
+            );
+            return false;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(
+                    null,
+                    "SQL error: " + e.getMessage(),
+                    "DB Error",
+                    JOptionPane.ERROR_MESSAGE
+            );
+            return false;
         } catch (Exception e) {
             e.printStackTrace();
+            JOptionPane.showMessageDialog(
+                    null,
+                    "Unexpected DB error: " + e.getMessage(),
+                    "DB Error",
+                    JOptionPane.ERROR_MESSAGE
+            );
             return false;
         }
     }
@@ -76,12 +117,11 @@ public class DatabaseManager {
 
             // Department filters
             if (!depts.isEmpty()) {
-                sb.append(" AND ");
-                sb.append("D.Dname ");
+                sb.append(" AND D.Dname ");
                 sb.append(notDept ? "NOT IN (" : "IN (");
 
                 for (int i = 0; i < depts.size(); i++) {
-                    sb.append("'" + depts.get(i) + "'");
+                    sb.append("'").append(depts.get(i)).append("'");
                     if (i < depts.size() - 1) sb.append(", ");
                 }
                 sb.append(") ");
@@ -89,12 +129,11 @@ public class DatabaseManager {
 
             // Project filters
             if (!projs.isEmpty()) {
-                sb.append(" AND ");
-                sb.append("P.Pname ");
+                sb.append(" AND P.Pname ");
                 sb.append(notProj ? "NOT IN (" : "IN (");
 
                 for (int i = 0; i < projs.size(); i++) {
-                    sb.append("'" + projs.get(i) + "'");
+                    sb.append("'").append(projs.get(i)).append("'");
                     if (i < projs.size() - 1) sb.append(", ");
                 }
                 sb.append(") ");
